@@ -31,20 +31,18 @@
 
     var ko = /^ko\b/i.test(navigator.language || "");
     var T = ko ? {
-      title: "초대를 받았어요",
-      body: "옥토 앱에서 친구 신청을 이어가요.",
+      invite: { title: "초대를 받았어요", body: "옥토 앱에서 친구 신청을 이어가요.", label: "초대 코드" },
+      code: { title: "옥토 친구 추가", body: "옥토 앱에서 이 코드로 연결 요청을 보낼 수 있어요.", label: "옥토 코드" },
       open: "앱에서 열기",
       install: "앱 설치하기",
-      hint: "앱을 설치했다면 ‘앱에서 열기’를 누르세요. 처음 설치했다면 설치 후 이 링크를 다시 눌러 주세요.",
-      code: "초대 코드",
+      hint: "앱을 설치했다면 ‘앱에서 열기’를 누르세요. 처음 설치했다면 설치 후 다시 열어 주세요.",
       notFound: "페이지를 찾을 수 없어요", check: "주소를 다시 확인해 주세요."
     } : {
-      title: "You're invited",
-      body: "Continue the friend request in the Octo app.",
+      invite: { title: "You're invited", body: "Continue the friend request in the Octo app.", label: "Invite code" },
+      code: { title: "Add a friend on Octo", body: "Send a link request with this code in the Octo app.", label: "Octo code" },
       open: "Open in app",
       install: "Get the app",
-      hint: "Already have Octo? Tap ‘Open in app’. Just installed it? Tap this link again after installing.",
-      code: "Invite code",
+      hint: "Already have Octo? Tap ‘Open in app’. Just installed it? Open this again after installing.",
       notFound: "Page not found", check: "Please check the address."
     };
 
@@ -54,36 +52,40 @@
     // 카카오톡 · 인스타그램 · 네이버 같은 앱 안 브라우저는 유니버설 링크/앱 링크로 앱을 열지 않는다.
     var inAppBrowser = /KAKAOTALK|Instagram|FBAN|FBAV|Line\/|NAVER|DaumApps|everytimeApp|Whale\/.*Mobile|SamsungBrowser\/.*CrossApp/i.test(ua);
 
-    var m = location.pathname.match(/^\/i\/([^\/?#]+)/);
+    // /i/<token>: 초대 링크(열면 바로 연결) · /c/<code>: 옥토 코드 QR(연결 요청)
+    var m = location.pathname.match(/^\/(i|c)\/([^\/?#]+)/);
     if (!m) {
       document.title = T.notFound;
       document.getElementById("app").innerHTML = "<h1></h1><p></p>";
       document.querySelector("h1").textContent = T.notFound;
       document.querySelector("p").textContent = T.check;
     } else {
-      var raw = m[1];
+      var kind = m[1];
+      var raw = m[2];
       var token = encodeURIComponent(decodeURIComponent(raw));
-      // 앱의 routeForLink: octopus://i/<token> → /i/<token>
-      var schemeUrl = "octopus://i/" + token;
-      // Android: 앱이 있으면 바로 열고, 없으면 Play 스토어로 간다(크롬 · 삼성 인터넷 · 카카오톡 모두 지원).
-      var playUrl = PLAY_STORE_URL + "&referrer=" + encodeURIComponent("invite=" + token);
-      var intentUrl = "intent://i/" + token + "#Intent;scheme=octopus;package=" + PACKAGE +
+      var shown = decodeURIComponent(raw);
+      if (kind === "c" && /^[0-9A-Za-z]{8}$/.test(shown)) shown = shown.toUpperCase().slice(0, 4) + "-" + shown.toUpperCase().slice(4);
+      var copy = kind === "c" ? T.code : T.invite;
+      // 앱의 routeForLink: octopus://i/<token> → /i/<token>, octopus://c/<code> → 코드가 채워진 연결 화면
+      var schemeUrl = "octopus://" + kind + "/" + token;
+      var playUrl = PLAY_STORE_URL + "&referrer=" + encodeURIComponent((kind === "c" ? "code=" : "invite=") + token);
+      var intentUrl = "intent://" + kind + "/" + token + "#Intent;scheme=octopus;package=" + PACKAGE +
         ";S.browser_fallback_url=" + encodeURIComponent(playUrl) + ";end";
       var openUrl = isAndroid ? intentUrl : schemeUrl;
       var storeUrl = isAndroid ? playUrl : APP_STORE_URL;
 
-      document.title = T.title;
+      document.title = copy.title;
       document.getElementById("app").innerHTML =
         '<h1 id="t"></h1><p id="b"></p>' +
         '<a class="btn" id="open"></a>' +
         '<a class="btn sub" id="install"></a>' +
         '<p class="hint" id="h"></p>' +
         '<p class="hint"><span id="cl"></span> <code id="c"></code></p>';
-      document.getElementById("t").textContent = T.title;
-      document.getElementById("b").textContent = T.body;
+      document.getElementById("t").textContent = copy.title;
+      document.getElementById("b").textContent = copy.body;
       document.getElementById("h").textContent = T.hint;
-      document.getElementById("cl").textContent = T.code;
-      document.getElementById("c").textContent = decodeURIComponent(raw);
+      document.getElementById("cl").textContent = copy.label;
+      document.getElementById("c").textContent = shown;
       var open = document.getElementById("open");
       open.textContent = T.open;
       open.href = openUrl;
